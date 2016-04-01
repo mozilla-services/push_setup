@@ -1,0 +1,17 @@
+EasyProcess==0.2.2
+argparse==1.2.1
+awacs==0.5.4
+awscli==1.10.17
+botocore==1.4.8
+click==6.4
+colorama==0.3.3
+docutils==0.12
+futures==3.0.5
+jmespath==0.9.0
+pyasn1==0.1.9
+python-dateutil==2.5.2
+rsa==3.3
+s3transfer==0.0.1
+six==1.10.0
+troposphere==1.5.0
+wsgiref==0.1.2
