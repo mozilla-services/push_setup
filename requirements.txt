@@ -13,5 +13,5 @@ python-dateutil==2.5.2
 rsa==3.3
 s3transfer==0.0.1
 six==1.10.0
-troposphere==1.5.0
+git+https://github.com/cloudtools/troposphere.git@6646f84562d21a99a028fce000d86e264b2c95c0#egg=troposphere
 wsgiref==0.1.2

@@ -22,10 +22,31 @@ desired.
 - Python 2.7
 - AWS credentials
 
-For log processing with lambda:
+For log processing with lambda and the push messages API:
 
 - Properly configured private subnet per
   https://github.com/mozilla-services/push-processor/#lambda-vpc-access
+
+Configuration help for CloudFormation Parameters:
+
+ProcessorVPCId
+    VPC that the processor subnets are in.
+
+ProcessorSubnetIds
+    Private subnet(s) you created. Used by Redis the Lambda function that
+    processes S3 logs and saves messages to Redis. Due to access of S3, this
+    subnet requires a NAT Gateway per the VPC access above.
+
+MessagesSubnetId
+    Subnets that should be allowed to access the Push Messages API, ie, the
+    subnet(s) the Developer Dashboard is in.
+
+MessageApiEC2Subnet
+    Subnet to run the actual Push Messages EC2 instance in. This subnet must
+    be on the same VPC as the subnets for the Processor and should be Internet
+    accessible (not the NAT'd Processor Subnet).
+
+## Creating a CloudFormation Config
 
 Create a virtualenv, activate it, and install the requirements:
 
@@ -33,7 +54,7 @@ Create a virtualenv, activate it, and install the requirements:
     $ source myenv/bin/activate
     $ pip install -r requirements.txt
 
-You are now ready for one-command AWS deployments!
+You are now ready to create a CloudFormation config!
 
 **Note**: The Push DynamoDB tables will **not be deleted** when shutting down
 the stack. This is intentional so that you can upgrade a stack to a new version
@@ -58,6 +79,64 @@ CloudFormation:
 
 Then specify this file in the AWS CloudFormation UI during Create Stack.
 
+Run this stack in us-east-1 using 2 t2.micro instances:
+
+[![LaunchStack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=myPushStack&templateURL=https://s3.amazonaws.com/cloudformation-push-setup/push_server.cf)
+
+**Note**: Before using the Launch Stack button here or below, remember that the
+default crypto-key here is only suitable for testing. Real use should have a
+new unique crypto-key, not this default.
+
+### Push Service + Firehose Logging
+
+Run:
+
+    $ python deploy.py push --firehose
+
+Run this stack in us-east-1 using 2 t2.micro instances:
+
+[![LaunchStack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=myPushStack&templateURL=https://s3.amazonaws.com/cloudformation-push-setup/push_server_firehose.cf)
+
+
+### Push Service + Firehose Logging + Push Messages API
+
+Run:
+
+    $ python deploy.ph push --processor
+
+The CloudFormation Output shows the internal IP of the Push Message API service
+that that the Developer Dashboard should be configured to access.
+
+Remember to setup a private NAT VPC per the instructions here first:
+https://github.com/mozilla-services/push-processor/#lambda-vpc-accessz
+
+## Post Setup
+
+There are some steps that may be required after the stack has been created.
+
+Outline:
+
+1. Add S3 Put Event to Processor Lambda Function
+2. Setup ELB for SSL termination
+
+If the stack included the Push Messages API, you will need to manually configure
+the Lambda Processor function. It should be set to trigger off the Firehose
+Logging Bucket's object creation event in the AWS Console for log processing to
+work. The Firehose bucket name and Lambda Processor name are provided in the
+CloudFormation Outputs after it runs to assist in this.
+
+If you're testing with Firefox, the plain websocket host provided will not work
+as Firefox requires a trusted websocket connection. An ELB with a valid SSL
+certificate should be added that terminates SSL and proxies TCP to the Push
+Connection Node.
+
+## Teardown
+
+When deleting the stack, Security Groups will frequently halt a complete
+tear-down due to ENI's created for the Lambda function. This will require some
+manual deletion in the AWS console, before the stack can then resume being
+deleted.
+
 ### Complete Push Stack Outline
 
 - EC2
@@ -67,9 +146,12 @@ Then specify this file in the AWS CloudFormation UI during Create Stack.
         - Same VPC subnet as Elasticache
 
 - VPC
-    - Private VPC
-        - Default route to NAT Gateway
-        - Lambda Push Processor Runs Here
+    - Private Subnet
+        - Default route to NAT Gateway for S3 Access
+        - Lambda Push Processor
+    - Public Subnet
+        - Push Messages API
+        - ElastiCache Redis
 
 - Security Groups
     - InternalRouter
